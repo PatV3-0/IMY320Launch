@@ -3,7 +3,7 @@ name: Deploy Dev to GitHub Pages
 on:
   push:
     branches:
-      - main   # or 'dev' if you want to deploy from that branch
+      - dev   # or 'dev' if you want to deploy from that branch
 
 jobs:
   deploy:
