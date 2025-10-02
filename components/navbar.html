@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navbar - CurioCrow</title>
+<link rel="stylesheet" href="../css/Navbar.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-top">
+    <!-- Logo -->
+    <div class="c-nav-left logo-name">
+      <a href="../index.html" class="logo">
+        <img src="../assets/LogoCBG.png" alt="Logo" class="c-nav-logo">
+        <span class="c-nav-name">CurioCrow</span>
+      </a>
+    </div>
+
+    <!-- Search -->
+<form class="search-container" id="searchForm">
+  <input type="text" id="searchInput" class="search-bar" placeholder="Search...">
+</form>
+
+
+    <!-- Cart -->
+    <a href="../pages/purchase.html" class="icon-button">
+      <img src="../assets/Cart.png" alt="Cart" class="cart-icon">
+    </a>
+
+    <!-- User Dropdown -->
+    <div class="user-menu">
+      <div class="user-dropdown">
+        <img src="../assets/UserIcon.png" alt="Profile" class="profile-icon" id="profileIcon">
+        <div class="dropdown-menu">
+          <!-- Content dynamically inserted based on login state -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="navbar-bottom">
+    <a href="../pages/home.html" class="nav-link active">Home</a>
+    <a href="../pages/coins.html" class="nav-link">Coins Directory</a>
+    <a href="../pages/sell.html" class="nav-link">Sell</a>
+    <a href="../pages/about.html" class="nav-link">About</a>
+    <a href="../pages/community.html" class="nav-link">Community</a>
+  </div>
+</nav>
+
+<script type="module">
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+
+document.addEventListener('DOMContentLoaded', () => {
+  const profileIcon = document.getElementById('profileIcon');
+  const dropdownMenu = document.querySelector('.dropdown-menu');
+  const searchForm = document.getElementById('searchForm');
+  const searchInput = document.getElementById('searchInput');
+
+  if (!profileIcon || !dropdownMenu) return console.error('Dropdown elements missing');
+
+  const auth = getAuth();
+
+  // ---------------- Profile Dropdown ----------------
+  profileIcon.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownMenu.classList.toggle('show');
+  });
+
+  document.addEventListener('click', () => dropdownMenu.classList.remove('show'));
+  dropdownMenu.addEventListener('click', e => e.stopPropagation());
+
+  onAuthStateChanged(auth, (user) => {
+    dropdownMenu.innerHTML = ''; // clear previous content
+
+    if (user) {
+      profileIcon.src = user.photoURL || '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `
+        <a href="../pages/profile.html" class="dropdown-item">Profile</a>
+        <button class="btn dropdown-item" id="logoutBtn">Logout</button>
+      `;
+      const logoutBtn = dropdownMenu.querySelector('#logoutBtn');
+      logoutBtn.addEventListener('click', async () => {
+        try {
+          await signOut(auth);
+          localStorage.clear();
+          window.location.href = "../index.html";
+        } catch (err) {
+          console.error("Logout failed:", err);
+          alert("Failed to log out. Try again.");
+        }
+      });
+    } else {
+      profileIcon.src = '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `
+        <a href="../pages/login.html" class="dropdown-item">Login</a>
+      `;
+    }
+  });
+
+  // ---------------- Search Bar ----------------
+  // ---------------- Search Bar ----------------
+searchForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const query = searchInput.value.trim();
+  if (!query) return;
+  console.log(query);
+  // Always redirect to coins page from any current page
+  window.location.href = '/pages/coins.html?search=' + encodeURIComponent(query);
+});
+
+});
+</script>
+
+</body>
+</html>

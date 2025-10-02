@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login / Register - CurioCrow</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/Navbar.css">
+<link rel="stylesheet" href="../css/Footer.css">
+<link rel="stylesheet" href="../css/LoginPage.css">
+<style>
+  /* Tooltip styles */
+  .coin-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    margin-left: 6px;
+  }
+  .coin-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background-color: #1A1F2B;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 6px;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.8rem;
+  }
+  .coin-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+  }
+</style>
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="container">
+  <form id="loginForm" novalidate>
+    <h2>Welcome</h2>
+    <p class="subheading" id="subheading">Log in to continue</p>
+
+    <div class="floating-label">
+      <input type="email" id="email" placeholder="Email">
+      <label>Email</label>
+      <p class="feedback" id="emailError"></p>
+    </div>
+
+    <div class="floating-label" id="usernameField" style="display:none;">
+      <input type="text" id="username" placeholder="Username (optional)">
+      <label>Username</label>
+      <p class="feedback" id="usernameError"></p>
+    </div>
+
+    <div class="floating-label">
+      <input type="password" id="password" placeholder="Password">
+      <label>Password
+        <span class="coin-tooltip" id="passwordCoins" style="display:none;">
+          <span id="coinDisplay">🪙🪙🪙🪙</span>
+          <span class="tooltip-text">
+            Earn coins for: 1 uppercase letter, 1 number, 1 special character, and length &gt; 8
+          </span>
+        </span>
+      </label>
+      <p class="feedback" id="passwordError"></p>
+    </div>
+
+    <div class="floating-label" id="confirmField" style="display:none;">
+      <input type="password" id="confirmPassword" placeholder="Confirm Password">
+      <label>Confirm Password
+        <span class="coin-tooltip" id="confirmCoins" style="display:none;">
+          <span id="confirmCoinDisplay">🪙🪙🪙🪙</span>
+          <span class="tooltip-text">Coins shown only if password matches and earns same rewards</span>
+        </span>
+      </label>
+      <p class="feedback" id="confirmError"></p>
+    </div>
+
+    <div class="signin-row" id="staySignedRow">
+      <label class="stay-signed-in">
+        <input type="checkbox" id="staySignedIn"> Stay signed in
+      </label>
+    </div>
+
+    <button type="submit" class="btn-login" id="submitBtn">Log In</button>
+    <div class="register-link" id="toggleLink">
+      <p>Don't have an account? <a href="#" id="toggleMode">Register here</a></p>
+    </div>
+    <p id="message" style="color:#fff; text-align:center; margin-top:10px;"></p>
+  </form>
+</div>
+
+<div id="footer"></div>
+
+<script type="module">
+const coinEmoji = '🪙';
+let isRegister = false;
+
+const loginForm = document.getElementById('loginForm');
+const emailEl = document.getElementById('email');
+const passwordEl = document.getElementById('password');
+const confirmEl = document.getElementById('confirmPassword');
+const usernameField = document.getElementById('usernameField');
+const confirmField = document.getElementById('confirmField');
+const subheading = document.getElementById('subheading');
+const submitBtn = document.getElementById('submitBtn');
+const toggleMode = document.getElementById('toggleMode');
+const messageEl = document.getElementById('message');
+const passwordCoins = document.getElementById('passwordCoins');
+const coinDisplay = document.getElementById('coinDisplay');
+const confirmCoins = document.getElementById('confirmCoins');
+const confirmCoinDisplay = document.getElementById('confirmCoinDisplay');
+
+function getPasswordScore(password) {
+  let score = 0;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+  if (password.length > 8) score++;
+  return score;
+}
+
+function updateCoins() {
+  if (!isRegister) return;
+  const score = getPasswordScore(passwordEl.value);
+  coinDisplay.textContent = coinEmoji.repeat(score);
+  passwordCoins.style.display = 'inline-block';
+
+  if (passwordEl.value && confirmEl.value && passwordEl.value === confirmEl.value) {
+    confirmCoinDisplay.textContent = coinEmoji.repeat(score);
+    confirmCoins.style.display = 'inline-block';
+  } else {
+    confirmCoinDisplay.textContent = '';
+    confirmCoins.style.display = 'none';
+  }
+}
+
+passwordEl.addEventListener('input', updateCoins);
+confirmEl.addEventListener('input', updateCoins);
+
+function toggleRegister() {
+  isRegister = !isRegister;
+  usernameField.style.display = isRegister ? 'block' : 'none';
+  confirmField.style.display = isRegister ? 'block' : 'none';
+  subheading.textContent = isRegister ? 'Register to continue' : 'Log in to continue';
+  submitBtn.textContent = isRegister ? 'Register' : 'Log In';
+  toggleMode.textContent = isRegister ? 'Login here' : 'Register here';
+  messageEl.textContent = '';
+  passwordCoins.style.display = 'none';
+  confirmCoins.style.display = 'none';
+}
+
+toggleMode.addEventListener('click', e => {
+  e.preventDefault();
+  toggleRegister();
+});
+
+loginForm.addEventListener('submit', e => {
+  e.preventDefault();
+  messageEl.textContent = '';
+  // Simplified validation for demo
+  if (!emailEl.value || !passwordEl.value) {
+    messageEl.style.color = 'red';
+    messageEl.textContent = 'Email and password are required.';
+    return;
+  }
+  if (isRegister && passwordEl.value !== confirmEl.value) {
+    messageEl.style.color = 'red';
+    messageEl.textContent = 'Passwords do not match.';
+    return;
+  }
+  messageEl.style.color = 'green';
+  messageEl.textContent = isRegister ? 'Registered!' : 'Logged in!';
+});
+</script>
+</body>
+</html>

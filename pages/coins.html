@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coins Directory - CurioCrow</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/CoinsDirectory.css">
+  <link rel="stylesheet" href="../css/Navbar.css">
+  <link rel="stylesheet" href="../css/Footer.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <div id="navbar"></div>
+
+  <div class="catalogue-page">
+    <div class="catalogue-header">
+      <h1>PRODUCT CATALOGUE</h1>
+    </div>
+
+    <div class="catalogue-content">
+
+      <!-- Sidebar Filters -->
+      <aside class="filters">
+        <h2>Filter By</h2>
+        <button class="reset-btn">Reset Filters</button>
+        <ul class="filter-list">
+          <li>
+            <h3>Metal</h3>
+            <div id="metalFilters"></div>
+          </li>
+          <li>
+            <h3>Country</h3>
+            <div id="countryFilters"></div>
+          </li>
+          <li>
+            <h3>Shape</h3>
+            <div id="shapeFilters"></div>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- Coin List -->
+      <div class="catalogue-list-section">
+        <div class="coin-list" id="coinList"></div>
+        <div class="load-more-wrapper">
+          <button class="load-more">Load more...</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="back-to-top" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })">↑ Top</button>
+  </div>
+
+  <!-- Footer -->
+  <div id="footer"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAvgqnAgdSQeGpgTMRMOvcaxB7fD8XbETk",
+      authDomain: "curiocrow.firebaseapp.com",
+      projectId: "curiocrow",
+      storageBucket: "curiocrow.appspot.com",
+      messagingSenderId: "570380745141",
+      appId: "1:570380745141:web:9df2526ec09b3f634e41fc"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ---------- Navbar & Footer ----------
+    fetch('../components/navbar.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('navbar').innerHTML = html;
+        setupNavbar(); // attach dropdown & search listeners after load
+      });
+
+    fetch('../components/footer.html')
+      .then(res => res.text())
+      .then(html => document.getElementById('footer').innerHTML = html);
+
+    function setupNavbar() {
+      const profileIcon = document.getElementById('profileIcon');
+      const dropdownMenu = document.querySelector('.dropdown-menu');
+      const searchForm = document.getElementById('searchForm');
+      const searchInput = document.getElementById('searchInput');
+
+      if (!profileIcon || !dropdownMenu || !searchForm || !searchInput) return;
+
+      // Profile dropdown
+      profileIcon.addEventListener('click', e => {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle('show');
+      });
+      dropdownMenu.addEventListener('click', e => e.stopPropagation());
+      document.addEventListener('click', () => dropdownMenu.classList.remove('show'));
+
+      // Firebase auth
+      onAuthStateChanged(auth, user => {
+        dropdownMenu.innerHTML = '';
+        if (user) {
+          profileIcon.src = user.photoURL || '../assets/UserIcon.png';
+          dropdownMenu.innerHTML = `
+            <a href="../pages/profile.html" class="dropdown-item">Profile</a>
+            <button class="btn dropdown-item" id="logoutBtn">Logout</button>
+          `;
+          const logoutBtn = dropdownMenu.querySelector('#logoutBtn');
+          logoutBtn.addEventListener('click', async () => {
+            try {
+              await signOut(auth);
+              localStorage.clear();
+              window.location.href = "../index.html";
+            } catch (err) {
+              console.error("Logout failed:", err);
+              alert("Failed to log out. Try again.");
+            }
+          });
+        } else {
+          profileIcon.src = '../assets/UserIcon.png';
+          dropdownMenu.innerHTML = `<a href="../pages/login.html" class="dropdown-item">Login</a>`;
+        }
+      });
+
+      // Search bar
+      searchForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (!query) return;
+        window.location.href = `../pages/coins.html?search=${encodeURIComponent(query)}`;
+      });
+    }
+
+    // ---------- Coins & Filters ----------
+    const coinListEl = document.getElementById('coinList');
+    const loadMoreBtn = document.querySelector('.load-more');
+    let allCoins = [];
+    let allDocIds = [];
+    const activeFilters = { Metal: new Set(), Country: new Set(), Shape: new Set() };
+
+    let displayedCount = 0;
+    const pageSize = 10;
+
+    // Get search query from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchQuery = urlParams.get('search')?.toLowerCase() || '';
+
+    async function loadCoins() {
+      try {
+        const snapshot = await getDocs(collection(db, "coins"));
+        const coins = [];
+        const docIds = [];
+
+        snapshot.docs.forEach(doc => {
+          coins.push(doc.data());
+          docIds.push(doc.id);
+        });
+
+        allCoins = coins;
+        allDocIds = docIds;
+
+        populateFilters(allCoins);
+        displayedCount = 0;
+        renderCoinsPage();
+      } catch (err) {
+        console.error(err);
+        coinListEl.innerHTML = "<p>Failed to load coins from database.</p>";
+      }
+    }
+
+    function applyFiltersAndSearch() {
+      return allCoins.filter(coin => {
+        const metalMatch = activeFilters.Metal.size === 0 || (coin.MetalComposition && coin.MetalComposition.some(m => activeFilters.Metal.has(m)));
+        const countryMatch = activeFilters.Country.size === 0 || activeFilters.Country.has(coin.Country);
+        const shapeMatch = activeFilters.Shape.size === 0 || activeFilters.Shape.has(coin.Shape);
+
+        const query = searchQuery.replace(/\s+/g, '').toLowerCase();
+        const searchMatch = searchQuery === '' || (
+          (coin.Name?.replace(/\s+/g, '').toLowerCase().includes(query)) ||
+          (coin.Country?.replace(/\s+/g, '').toLowerCase().includes(query)) ||
+          (coin.Series?.replace(/\s+/g, '').toLowerCase().includes(query)) ||
+          (coin.Description?.replace(/\s+/g, '').toLowerCase().includes(query)) ||
+          (coin.FaceValue?.toString().includes(query)) ||
+          (coin.Currency?.toLowerCase().includes(query))
+        );
+
+        return metalMatch && countryMatch && shapeMatch && searchMatch;
+      });
+    }
+
+    function renderCoinsPage() {
+      const filteredCoins = applyFiltersAndSearch();
+      const coinsToRender = filteredCoins.slice(0, displayedCount + pageSize);
+      const docIdsToRender = coinsToRender.map(c => allDocIds[allCoins.indexOf(c)]);
+
+      coinListEl.innerHTML = '';
+      coinsToRender.forEach((coin, index) => {
+        const metals = coin.MetalComposition ? coin.MetalComposition.join(', ') : '';
+        const docId = docIdsToRender[index];
+        coinListEl.innerHTML += `
+          <div class="coin-row-list">
+            <div class="coin-info-list">
+              <img src="${coin.Link || '../assets/coin.png'}" alt="${coin.Name}" class="coin-img-list">
+              <div class="coin-text-list">
+                <h3>${coin.Name}</h3>
+                <p>${coin.Country} - ${coin.FaceValue} ${coin.Currency}</p>
+                <p>Series: ${coin.Series || ''}, Shape: ${coin.Shape || ''}</p>
+                <p>Metal: ${metals}</p>
+                <p>${coin.Description || ''}</p>
+              </div>
+            </div>
+            <a href="product.html?id=${docId}" class="btn-product-view">View</a>
+          </div>
+        `;
+      });
+
+      displayedCount += pageSize;
+      loadMoreBtn.style.display = displayedCount < filteredCoins.length ? 'block' : 'none';
+    }
+
+    loadMoreBtn.addEventListener('click', () => {
+      renderCoinsPage();
+    });
+
+    function populateFilters(coins) {
+      const metalsSet = new Set();
+      const countriesSet = new Set();
+      const shapesSet = new Set();
+
+      coins.forEach(coin => {
+        if (coin.MetalComposition) coin.MetalComposition.forEach(m => metalsSet.add(m));
+        if (coin.Country) countriesSet.add(coin.Country);
+        if (coin.Shape) shapesSet.add(coin.Shape);
+      });
+
+      document.getElementById('metalFilters').innerHTML = Array.from(metalsSet).map(m => `<button class="dropdown-item" data-type="Metal">${m}</button>`).join('');
+      document.getElementById('countryFilters').innerHTML = Array.from(countriesSet).map(c => `<button class="dropdown-item" data-type="Country">${c}</button>`).join('');
+      document.getElementById('shapeFilters').innerHTML = Array.from(shapesSet).map(s => `<button class="dropdown-item" data-type="Shape">${s}</button>`).join('');
+
+      attachFilterLogic();
+    }
+
+    function attachFilterLogic() {
+      document.querySelectorAll('.dropdown-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.getAttribute('data-type');
+          const value = btn.textContent;
+
+          if (activeFilters[type].has(value)) {
+            activeFilters[type].delete(value);
+            btn.classList.remove('active');
+          } else {
+            activeFilters[type].add(value);
+            btn.classList.add('active');
+          }
+          displayedCount = 0;
+          renderCoinsPage();
+        });
+      });
+
+      document.querySelector('.reset-btn').addEventListener('click', () => {
+        Object.keys(activeFilters).forEach(key => activeFilters[key].clear());
+        document.querySelectorAll('.dropdown-item').forEach(btn => btn.classList.remove('active'));
+        displayedCount = 0;
+        renderCoinsPage();
+      });
+    }
+
+    loadCoins();
+  </script>
+</body>
+</html>

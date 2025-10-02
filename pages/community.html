@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community - CurioCrow</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/Navbar.css">
+  <link rel="stylesheet" href="../css/Footer.css">
+  <link rel="stylesheet" href="../css/CommunityPage.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <div id="navbar"></div>
+
+  <div class="community-page">
+
+    <!-- Header Section -->
+    <div class="parallax-bg">
+      <div class="overlay"></div>
+      <div class="header-content">
+        <h1>Join the Coin Collectors Community</h1>
+        <p>Stay updated with the latest coin insights, rare finds, and collector tips!</p>
+      </div>
+    </div>
+
+    <!-- Newsletter Section -->
+    <section class="newsletter">
+      <h2>Subscribe to our Newsletter</h2>
+      <form class="newsletter-form" id="newsletterForm">
+        <input type="email" id="emailInput" placeholder="Enter your email" required>
+        <button type="submit" class="btn-news">Subscribe</button>
+      </form>
+      <p id="thankYouMessage" class="thank-you" style="display:none;">Thank you for subscribing!</p>
+
+      <div class="newsletter-sample">
+        <h3>Newsletter: Introduction to Coin Collecting</h3>
+        <p>
+          Welcome to the fascinating world of coin collecting! Whether you are
+          a beginner or an experienced numismatist, coin collecting opens a
+          window into history, culture, and art. Each coin tells a story — from
+          ancient civilizations to modern currency. Start your collection today
+          by exploring coins from different eras, metals, and countries. Remember,
+          the joy is not just in owning coins but in discovering the history behind them.
+        </p>
+      </div>
+    </section>
+
+    <!-- Community Section -->
+    <section class="community-info">
+      <h2>Engage with Fellow Collectors</h2>
+      <p>
+        Share your finds, ask questions, and connect with coin enthusiasts
+        worldwide. Our community thrives on knowledge, tips, and shared passion.
+      </p>
+    </section>
+
+  </div>
+
+  <!-- Footer -->
+  <div id="footer"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAvgqnAgdSQeGpgTMRMOvcaxB7fD8XbETk",
+    authDomain: "curiocrow.firebaseapp.com",
+    projectId: "curiocrow",
+    storageBucket: "curiocrow.appspot.com",
+    messagingSenderId: "570380745141",
+    appId: "1:570380745141:web:9df2526ec09b3f634e41fc"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // ---------- Load Navbar ----------
+  fetch('../components/navbar.html')
+    .then(res => res.text())
+    .then(html => {
+      document.getElementById('navbar').innerHTML = html;
+      setupNavbar();
+    })
+    .catch(err => console.error('Error loading navbar:', err));
+
+  function setupNavbar() {
+  const userDropdown = document.querySelector('.user-dropdown');
+  const dropdownMenu = userDropdown.querySelector('.dropdown-menu');
+  const profileIcon = userDropdown.querySelector('.profile-icon');
+
+  // Search elements
+  const searchForm = document.querySelector('.search-container'); // <- use querySelector
+  const searchInput = searchForm.querySelector('.search-bar');
+
+  if (!userDropdown || !dropdownMenu || !profileIcon || !searchForm || !searchInput)
+    return console.error('Navbar elements missing');
+
+  // Profile dropdown logic
+  profileIcon.addEventListener('click', e => {
+    e.stopPropagation();
+    dropdownMenu.classList.toggle('show');
+  });
+  dropdownMenu.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', () => dropdownMenu.classList.remove('show'));
+
+  onAuthStateChanged(auth, user => {
+    dropdownMenu.innerHTML = '';
+    if (user) {
+      profileIcon.src = user.photoURL || '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `
+        <a href="../pages/profile.html" class="dropdown-item">Profile</a>
+        <button class="btn dropdown-item" id="logoutBtn">Logout</button>
+      `;
+      const logoutBtn = dropdownMenu.querySelector('#logoutBtn');
+      logoutBtn.addEventListener('click', async () => {
+        try {
+          await signOut(auth);
+          localStorage.clear();
+          window.location.href = "../index.html";
+        } catch (err) {
+          console.error("Logout failed:", err);
+          alert("Failed to log out. Try again.");
+        }
+      });
+    } else {
+      profileIcon.src = '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `<a href="../pages/login.html" class="dropdown-item">Login</a>`;
+    }
+  });
+
+  // --- Search bar logic (attach after navbar is loaded) ---
+  searchForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const query = searchInput.value.trim();
+    if (!query) return;
+    // Use relative path to coins.html
+    window.location.href = '../pages/coins.html?search=' + encodeURIComponent(query);
+  });
+}
+
+
+  // ---------- Load Footer ----------
+  fetch('../components/footer.html')
+    .then(res => res.text())
+    .then(html => document.getElementById('footer').innerHTML = html)
+    .catch(err => console.error('Error loading footer:', err));
+
+  // ---------- Newsletter form ----------
+  const form = document.getElementById('newsletterForm');
+  const emailInput = document.getElementById('emailInput');
+  const thankYouMessage = document.getElementById('thankYouMessage');
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    console.log('Subscribed:', emailInput.value);
+    emailInput.value = '';
+    thankYouMessage.style.display = 'block';
+  });
+</script>
+
+</body>
+</html>

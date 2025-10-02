@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coin Details - CurioCrow</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/Navbar.css">
+<link rel="stylesheet" href="../css/Footer.css">
+<link rel="stylesheet" href="../css/ProductPage.css">
+<style>
+/* Popup Notification */
+.popup-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #333;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 9999;
+  transform: translateY(-20px);
+  font-family: sans-serif;
+  font-size: 14px;
+}
+.popup-notification.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<div id="navbar"></div>
+
+<div class="product-page">
+  <a href="coins.html" class="back-link">← Back to Catalogue</a>
+
+  <div class="product-page-section">
+    <div class="product-content">
+
+      <div class="coin-image">
+        <img src="../assets/coin.png" alt="Coin Image">
+      </div>
+
+      <div class="coin-details">
+        <h1 class="coin-title">Loading...</h1>
+        <p class="coin-description"></p>
+        <p><strong>Price:</strong> <span class="coin-price"></span></p>
+
+        <div class="coin-attributes">
+          <div class="attribute"><strong>Country:</strong> <span class="coin-country"></span></div>
+          <div class="attribute"><strong>Series:</strong> <span class="coin-series"></span></div>
+          <div class="attribute"><strong>Shape:</strong> <span class="coin-shape"></span></div>
+          <div class="attribute"><strong>Metal:</strong> <span class="coin-metal"></span></div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn add-to-collection">Add to Cart</button>
+          <button class="btn add-to-wishlist">Add to Wishlist</button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Popup Notification -->
+<div id="popup-notification" class="popup-notification"></div>
+
+<!-- Footer -->
+<div id="footer"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, collection as fbCollection, query, where, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+
+// ---------------- Firebase Config ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyAvgqnAgdSQeGpgTMRMOvcaxB7fD8XbETk",
+  authDomain: "curiocrow.firebaseapp.com",
+  projectId: "curiocrow",
+  storageBucket: "curiocrow.appspot.com",
+  messagingSenderId: "570380745141",
+  appId: "1:570380745141:web:9df2526ec09b3f634e41fc"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ---------------- Navbar & Footer ----------------
+fetch('../components/navbar.html')
+  .then(res => res.text())
+  .then(html => { document.getElementById('navbar').innerHTML = html; setupNavbar(); })
+  .catch(err => console.error('Error loading navbar:', err));
+
+fetch('../components/footer.html')
+  .then(res => res.text())
+  .then(html => { document.getElementById('footer').innerHTML = html; })
+  .catch(err => console.error('Error loading footer:', err));
+
+function setupNavbar() {
+  const profileIcon = document.getElementById('profileIcon');
+  const dropdownMenu = document.querySelector('.dropdown-menu');
+  const searchForm = document.getElementById('searchForm');
+  const searchInput = document.getElementById('searchInput');
+
+  if (!profileIcon || !dropdownMenu) return;
+
+  profileIcon.addEventListener('click', e => {
+    e.stopPropagation();
+    dropdownMenu.classList.toggle('show');
+  });
+  dropdownMenu.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', () => dropdownMenu.classList.remove('show'));
+
+  onAuthStateChanged(auth, user => {
+    dropdownMenu.innerHTML = '';
+    if (user) {
+      profileIcon.src = user.photoURL || '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `
+        <a href="profile.html" class="dropdown-item">Profile</a>
+        <button class="btn dropdown-item" id="logoutBtn">Logout</button>
+      `;
+      dropdownMenu.querySelector('#logoutBtn').addEventListener('click', async () => {
+        await signOut(auth);
+        localStorage.clear();
+        window.location.href = "../index.html";
+      });
+    } else {
+      profileIcon.src = '../assets/UserIcon.png';
+      dropdownMenu.innerHTML = `<a href="login.html" class="dropdown-item">Login</a>`;
+    }
+  });
+
+  if (searchForm && searchInput) {
+    searchForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const queryStr = searchInput.value.trim();
+      if (!queryStr) return;
+      window.location.href = `coins.html?search=${encodeURIComponent(queryStr)}`;
+    });
+  }
+}
+
+// ---------------- Popup Function ----------------
+function showPopup(message, duration = 2000) {
+  const popup = document.getElementById('popup-notification');
+  popup.textContent = message;
+  popup.classList.add('show');
+  setTimeout(() => popup.classList.remove('show'), duration);
+}
+
+// ---------------- Load Coin Data ----------------
+let coinDataLoaded = false;
+let coinData = {};
+
+function getCoinIdFromURL() {
+  return new URLSearchParams(window.location.search).get('id');
+}
+
+async function loadCoin() {
+  const coinId = getCoinIdFromURL();
+  if (!coinId) { showPopup("Coin ID missing in URL"); return; }
+  const coinRef = doc(db, "coins", coinId);
+  const coinSnap = await getDoc(coinRef);
+  if (!coinSnap.exists()) { showPopup("Coin not found"); return; }
+  const coin = coinSnap.data();
+
+  coinData = {
+    _id: coinId,
+    Name: coin.Name || 'Unknown Coin',
+    img: coin.Link || '../assets/coin.png',
+    FaceValue: coin.FaceValue || 0,
+    Currency: coin.Currency || '',
+    Country: coin.Country || '',
+    quantity: 1
+  };
+  coinDataLoaded = true;
+
+  document.querySelector('.coin-image img').src = coinData.img;
+  document.querySelector('.coin-title').textContent = coinData.Name;
+  document.querySelector('.coin-description').textContent = coin.Description || '';
+  document.querySelector('.coin-price').textContent = coinData.FaceValue;
+  document.querySelector('.coin-country').textContent = coinData.Country;
+  document.querySelector('.coin-series').textContent = coin.Series || '';
+  document.querySelector('.coin-shape').textContent = coin.Shape || '';
+  document.querySelector('.coin-metal').textContent = coin.MetalComposition ? coin.MetalComposition.join(', ') : '';
+}
+
+// ---------------- Add to Cart / Wishlist ----------------
+onAuthStateChanged(auth, async user => {
+  const addToCartBtn = document.querySelector('.add-to-collection');
+  const addToWishlistBtn = document.querySelector('.add-to-wishlist');
+  const coinId = getCoinIdFromURL();
+
+  if (!addToCartBtn || !addToWishlistBtn) return;
+
+  // ----- Add to Cart -----
+  addToCartBtn.addEventListener('click', () => {
+    if (!coinDataLoaded) {
+      showPopup("Please wait for the coin to load.");
+      return;
+    }
+
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    let existing = cart.find(c => c._id === coinData._id);
+
+    if (existing) {
+      existing.quantity += 1;
+      showPopup("Increased quantity in cart!");
+    } else {
+      cart.push({...coinData});
+      showPopup("Added to cart!");
+    }
+
+    localStorage.setItem('cart', JSON.stringify(cart));
+  });
+
+  // ----- Wishlist -----
+  if (!user) {
+    addToWishlistBtn.disabled = true;
+    return;
+  }
+
+  async function toggleWishlist() {
+    try {
+      const q = query(fbCollection(db, "wishlist"), 
+                      where("userEmail", "==", user.email),
+                      where("coinId", "==", coinId));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        for (const docSnap of snapshot.docs) await deleteDoc(doc(db, "wishlist", docSnap.id));
+        showPopup("Coin removed from your wishlist!");
+        addToWishlistBtn.textContent = "Add to Wishlist";
+      } else {
+        await addDoc(fbCollection(db, "wishlist"), {
+          userEmail: user.email,
+          coinId: coinId,
+          addedAt: new Date()
+        });
+        showPopup("Coin added to your wishlist!");
+        addToWishlistBtn.textContent = "Remove from Wishlist";
+      }
+    } catch (err) {
+      console.error("Error toggling wishlist:", err);
+      showPopup("Failed to update wishlist.");
+    }
+  }
+
+  // Initialize wishlist button text
+  const initialQuery = query(fbCollection(db, "wishlist"), 
+                             where("userEmail", "==", user.email),
+                             where("coinId", "==", coinId));
+  const initialSnap = await getDocs(initialQuery);
+  if (!initialSnap.empty) addToWishlistBtn.textContent = "Remove from Wishlist";
+
+  addToWishlistBtn.addEventListener('click', toggleWishlist);
+});
+
+loadCoin();
+</script>
+
+</body>
+</html>
