@@ -3,7 +3,7 @@ name: Deploy Dev to GitHub Pages
 on:
   push:
     branches:
-      - dev
+      - main   # or 'dev' if you want to deploy from that branch
 
 jobs:
   deploy:
@@ -17,7 +17,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./       # root folder with index.html
-          force_orphan: true    # creates gh-pages branch if it doesn't exist
+          publish_dir: ./       
+          force_orphan: true    
           user_name: 'github-actions'
           user_email: 'github-actions@github.com'
